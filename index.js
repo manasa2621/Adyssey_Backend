@@ -89,6 +89,7 @@ app.post("/login", async (req, res) => {
       statuscode: 200,
       message: "Login successful",
       role: role,
+      company: user.company_name,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -197,6 +198,32 @@ INNER JOIN
   }
 });
 
+app.get("/count", async (req, res) => {
+  const { company_name } = req.query; // Get company_name from query parameters
+
+  try {
+    // Query to get the total users and active users based on the company_name
+    const countQuery = `
+        SELECT 
+          COUNT(DISTINCT trucking.email) AS total_vehicles,
+          COUNT(DISTINCT CASE WHEN trucking.status = true THEN trucking.email END) AS active_vehicles
+        FROM 
+          users
+        INNER JOIN
+          trucking ON trucking.email = users.email
+        WHERE 
+          users.company_name = $1;
+      `;
+
+    const countResult = await pool.query(countQuery, [company_name]);
+
+    res.status(200).json(countResult.rows[0]);
+  } catch (error) {
+    console.error("Error fetching trucking stats:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 app.get("/user_profile", async (req, res) => {
   const { email } = req.query;
 
@@ -235,6 +262,22 @@ app.get("/user_profile", async (req, res) => {
     res.status(200).json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/help", async (req, res) => {
+  const { email, query } = req.body;
+
+  try {
+    // Insert new help request into the database
+    const newHelpRequest = await pool.query(
+      "INSERT INTO help (email, query) VALUES ($1, $2) RETURNING *",
+      [email, query]
+    );
+
+    res.status(201).json(newHelpRequest.rows[0]);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 
