@@ -25,7 +25,6 @@ const pool = new Pool({
 });
 const token = "vercel_blob_rw_R0V287wjn08aLJdj_dHfLgCYThU1alsJxpH5BzVtTfB1ESg";
 
-console.log("Blob Token:", token);
 // Configure multer for file uploads
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -104,6 +103,36 @@ app.get("/employees", async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 });
+
+app.get("/home", async (req, res) => {
+  const {email} = req.query;
+  try {
+    
+    const routes = await pool.query('SELECT source, destination FROM trucking WHERE email = $1', [email]);
+    res.status(200).json(routes.rows);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put("/home", async (req, res) => {
+    const { email,source,destination } = req.body;
+
+    try {
+      const updateStatus = await pool.query(
+        "UPDATE trucking SET source = $1 ,destination=$2 WHERE email = $3 RETURNING *",
+        [source,destination,email]
+      );
+  
+      if (updateStatus.rowCount === 0) {
+        return res.status(404).json({ error: "source not found" });
+      }
+  
+      res.status(200).json(updateStatus.rows[0]);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  });
 
 app.post("/trucking", async (req, res) => {
   const {
@@ -199,10 +228,9 @@ INNER JOIN
 });
 
 app.get("/count", async (req, res) => {
-  const { company_name } = req.query; // Get company_name from query parameters
+  const { company_name } = req.query;
 
   try {
-    // Query to get the total users and active users based on the company_name
     const countQuery = `
         SELECT 
           COUNT(DISTINCT trucking.email) AS total_vehicles,
@@ -278,6 +306,147 @@ app.post("/help", async (req, res) => {
     res.status(201).json(newHelpRequest.rows[0]);
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/help", async (req, res) => {
+  try {
+    const queries = await pool.query("SELECT * FROM help");
+    res.status(200).json(queries.rows);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/help_response", async (req, res) => {
+  const {email} = req.query;
+  try {
+    const queries = await pool.query("SELECT * FROM help where email=$1",[email]);
+    res.status(200).json(queries.rows);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put("/help", async (req, res) => {
+const { email,response} = req.body;
+
+try {
+  const updateStatus = await pool.query(
+    "UPDATE help SET response = $1  WHERE email = $2 RETURNING *",
+    [response,email]
+  );
+
+  if (updateStatus.rowCount === 0) {
+    return res.status(404).json({ error: "source not found" });
+  }
+
+  res.status(200).json(updateStatus.rows[0]);
+} catch (error) {
+  res.status(400).json({ error: error.message });
+}
+});
+
+app.delete('/help', async (req, res) => {
+  const { email } = req.query;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email parameter is required' });
+  }
+
+  try {
+    // Perform the DELETE operation
+    const result = await pool.query('DELETE FROM help WHERE email = $1 RETURNING *', [email]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'No query found for the given email' });
+    }
+
+    res.status(200).json({ message: 'Query deleted successfully' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/help_response', async (req, res) => {
+  const { id } = req.query;
+
+  try {
+    // Perform the DELETE operation
+    const result = await pool.query('DELETE FROM help WHERE id = $1 RETURNING *', [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'No query found for the given id' });
+    }
+
+    res.status(200).json({ message: 'Query deleted successfully' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+
+app.post("/update_profile", async (req, res) => {
+  const {
+    name,
+    company_name,
+    email,
+    vehicle_number,
+    vehicle_type,
+    registration_number,
+    insuranceUrl,
+    taxUrl,
+    rcUrl,
+    status,
+  } = req.body;
+
+  try {
+    const updateQuery = `
+      UPDATE trucking 
+      SET 
+        vehicle_number = $1,
+        vehicle_type = $2,
+        registration_number = $3,
+        insurance_url = $4,
+        tax_url = $5,
+        rc_url = $6,
+        status = $7
+      WHERE email = $8
+    `;
+
+    await pool.query(updateQuery, [
+      vehicle_number,
+      vehicle_type,
+      registration_number,
+      insuranceUrl,
+      taxUrl,
+      rcUrl,
+      status,
+      email,
+    ]);
+
+    const updateUserQuery = `
+      UPDATE users
+      SET 
+        first_name = $1,
+        last_name = $2,
+        company_name = $3
+      WHERE email = $4
+    `;
+
+    const [firstName, lastName] = name ? name.split(" ") : [""];
+
+    await pool.query(updateUserQuery, [
+      firstName,
+      lastName,
+      company_name,
+      email,
+    ]);
+
+    res.status(200).json({ message: "Profile updated successfully" });
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
