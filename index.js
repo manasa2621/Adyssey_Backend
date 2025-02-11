@@ -191,7 +191,7 @@ app.post("/activate", async (req, res) => {
 });
 
 // Upload route
-app.post("/upload", upload.single("file"), async (req, res) => {
+app.post("/upload", upload.any(), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
