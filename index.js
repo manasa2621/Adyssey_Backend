@@ -190,25 +190,30 @@ app.post("/activate", async (req, res) => {
   }
 });
 
-// Upload route
 app.post("/upload", upload.any(), async (req, res) => {
-  console.log('upload function called')
+  console.log('upload url called')
   try {
-    if (!req.file) {
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const { originalname, buffer } = req.file;
-    const { url } = await put(originalname, buffer, {
-      access: "public",
-      token: token,
-    });
+    const uploadedFiles = await Promise.all(
+      req.files.map(async (file) => {
+        const { originalname, buffer } = file;
+        const { url } = await put(originalname, buffer, {
+          access: "public",
+          token: token,
+        });
+        return { key: file.fieldname, url };
+      })
+    );
 
-    res.status(200).json({ url });
+    res.status(200).json({ files: uploadedFiles });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 app.get("/trucking", async (req, res) => {
   try {
